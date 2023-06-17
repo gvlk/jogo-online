@@ -2,8 +2,9 @@ import pygame as pg
 import pygame.freetype
 from pygame.math import Vector2
 
-from modules.mouse import Mouse
+from entities.player import Player
 from modules.debug import Debug
+from modules.mouse import Mouse
 
 
 class GameController:
@@ -21,6 +22,8 @@ class GameController:
         self.clock = pg.time.Clock()
 
         # setup game modules
+        self.player = Player((width // 2, height // 2))
+        self.player_group = pg.sprite.GroupSingle(self.player)
         self.mouse = Mouse()
         self.mouse_group = pg.sprite.GroupSingle(self.mouse)
         self.debug = Debug()
@@ -28,40 +31,42 @@ class GameController:
         # setup game variables
 
         # initialize game
-        self.initialize_world()
+        self.run = True
+        self.run_game()
 
-    def initialize_world(self) -> None:
-        while True:
+    def run_game(self) -> None:
+        while self.run:
             self.catch_events()
             self.tick_world()
+        pygame.quit()
+        exit()
 
     def catch_events(self) -> None:
         for event in pygame.event.get():
 
             # quit game
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
+            if event.type == pg.QUIT:
+                self.run = False
 
-            # key press
-            elif event.type == pygame.KEYDOWN:
-                self.catch_keypress(event)
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE:
+                    self.run = False
 
             # mouse movement
-            elif event.type == pygame.MOUSEMOTION:
+            elif event.type == pg.MOUSEMOTION:
                 self.mouse.pos = Vector2(pg.mouse.get_pos())
-
-    def catch_keypress(self, event: pygame.event.Event) -> None:
-        if event.key == pygame.K_ESCAPE:
-            pygame.quit()
-            exit()
+                self.mouse.rect.center = self.mouse.pos
 
     def tick_world(self) -> None:
 
-        self.screen.fill((240, 240, 240))
+        # update background
+        self.screen.fill((235, 235, 235))
+
+        # display player
+        self.player_group.update()
+        self.player_group.draw(self.screen)
 
         # mouse
-        self.mouse.rect.center = self.mouse.pos
         self.mouse_group.draw(self.screen)
 
         # debug
@@ -69,4 +74,4 @@ class GameController:
 
         # run tick
         pg.display.update()
-        self.clock.tick(60)
+        self.clock.tick(30)
