@@ -42,30 +42,41 @@ class ServerController:
                     f"Flow Info: {client_address[2]}\n"
                     f"Scope ID: {client_address[3]}\n"
                 )
-                client_thread = ClientThread(
-                    client_socket,
-                    client_address,
-                    self.players_pos
-                )
-                clients = tuple(client.player_id for client in self.clients)
-                client_thread.socket.send(dumps(
-                    {
-                        'status': STATUS_NEW_PLAYER,
-                        'data': clients
-                    }
-                ))
-
-                for client in self.clients:
-                    client.socket.send(dumps(
-                        {
-                            'status': STATUS_NEW_PLAYER,
-                            'data': (client_thread.player_id,)
-                        }
-                    ))
-
-                self.players_pos[client_thread.player_id] = (int(), int())
-                self.clients.add(client_thread)
+                client_thread = self.initialize_client_thread(client_socket, client_address)
                 client_thread.start()
+
+    def initialize_client_thread(self, client_socket, client_address):
+        client_thread = ClientThread(
+            client_socket,
+            client_address,
+            self.players_pos
+        )
+        # print(client_thread.player_id, "CONECTADO")
+
+        # send current connected clients
+        clients = tuple(client.player_id for client in self.clients)
+        message = {
+                'status': STATUS_NEW_PLAYER,
+                'data': clients
+            }
+        message_bytes = dumps(message)
+        # print(f"SERVER ENVIOU ({message}) COMPRIMENTO ({len(message_bytes)}) PARA {client_thread.player_id}")
+        client_thread.socket.send(message_bytes)
+
+        # send to current connected clients a STATUS_NEW_PLAYER with this new player ID
+        for client in self.clients:
+            message = {
+                    'status': STATUS_NEW_PLAYER,
+                    'data': (client_thread.player_id,)
+                }
+            message_bytes = dumps(message)
+            # print(f"SERVER ENVIOU ({message}) COMPRIMENTO ({len(message_bytes)}) PARA {client.player_id}")
+            client.socket.send(message_bytes)
+
+        self.players_pos[client_thread.player_id] = (int(), int())
+        self.clients.add(client_thread)
+
+        return client_thread
 
     def update_players(self) -> None:
         while True:
