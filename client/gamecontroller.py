@@ -1,14 +1,15 @@
+from pickle import dumps, loads
+from socket import socket, AF_INET6, SOCK_STREAM, SOCK_DGRAM, error, timeout, gaierror, herror
+
 import pygame as pg
 import pygame.freetype
 from pygame.math import Vector2
 
-from entities.player import Player
-from entities.allie import Allie
-from modules.debug import Debug
-from modules.mouse import Mouse
-
-from socket import socket, AF_INET6, SOCK_STREAM, error, timeout, gaierror, herror
-from pickle import dumps, loads
+from client.entities.allie import Allie
+from client.entities.player import Player
+from client.modules.debug import Debug
+from client.modules.mouse import Mouse
+from common.messagecode import MessageCode
 
 SERVER_IP = "fe80::9c48:7cda:800:9f84%4"
 SERVER_PORT = 5000
@@ -29,7 +30,7 @@ class GameController:
         pg.freetype.init()
         pg.event.set_grab(True)
         pg.display.set_caption(f'Window Size ({width}x{height})')
-        pg.freetype.Font('assets/fonts/AlumniSansPinstripe-Regular.ttf', 24)
+        pg.freetype.Font('client/assets/fonts/AlumniSansPinstripe-Regular.ttf', 24)
         pg.mouse.set_visible(False)
 
         # setup game
@@ -37,7 +38,8 @@ class GameController:
         self.clock = pg.time.Clock()
 
         # setup multiplayer
-        self.socket: socket | None = None
+        self.tcp_socket = None
+        self.udp_socket = None
         self.allies_group = pg.sprite.Group()
         self.online = False
 
@@ -60,7 +62,7 @@ class GameController:
             self.draw()
             self.clock.tick(30)
         if self.online:
-            self.socket.close()
+            self.tcp_socket.close()
         pygame.quit()
         exit()
 
@@ -77,7 +79,7 @@ class GameController:
                     self.run = False
                 elif event.key == pg.K_c:
                     if not self.online:
-                        self.conncect_to_server(SERVER_IP, SERVER_PORT)
+                        self.initialize_server_connection(SERVER_IP, SERVER_PORT)
 
             # mouse movement
             elif event.type == pg.MOUSEMOTION:
@@ -89,28 +91,43 @@ class GameController:
         self.allies_group.update()
         pg.display.update()
 
-    def handle_server_communication(self) -> dict | None:
-        response: dict
+    def handle_server_communication(self) -> None:
 
-        self.socket.send(dumps((self.player.rect.topleft, self.player.rect.size)))
+        message = {
+            'code': MessageCode.PLAYER_UPDATE,
+            'data': (self.player.rect.topleft, self.player.rect.size)
+        }
+        message_bytes = dumps(message)
+        self.tcp_socket.send(message_bytes)
 
-        received_data = self.socket.recv(256)
-        if not received_data:
-            return None
-        else:
-            response = loads(received_data)
+        self.handle_server_response(self.tcp_socket.recv(256))
 
-            if response['status'] == 200:
-                for allie in self.allies_group:
-                    allie.rect.x = response['data'][allie.id][0]
-                    allie.rect.y = response['data'][allie.id][1]
+    def handle_server_response(self, response_bytes) -> None:
+        response = loads(response_bytes)
 
-            elif response['status'] == 100:
-                for player in response['data']:
-                    new_player = Allie(player)
-                    self.allies_group.add(new_player)
+        if response['code'] == MessageCode.PLAYERS_POSITIONS:
+            for allie in self.allies_group:
+                allie.rect.x = response['data'][allie.id][0]
+                allie.rect.y = response['data'][allie.id][1]
 
-            return response
+        elif response['code'] == MessageCode.NEW_PLAYER:
+            for player in response['data']:
+                new_player = Allie(player)
+                self.allies_group.add(new_player)
+            message = {
+                'code': MessageCode.CHECK_CURRENT_PLAYERS,
+                'data': tuple(p.id for p in self.allies_group)
+            }
+            message_bytes = dumps(message)
+            self.tcp_socket.send(message_bytes)
+
+        elif response['code'] == MessageCode.PLAYER_UPDATE_INFO:
+            message = {
+                'code': MessageCode.PLAYER_UPDATE_INFO,
+                'data': {'player_id': self.player.id}
+            }
+            message_bytes = dumps(message)
+            self.tcp_socket.send(message_bytes)
 
     def draw(self) -> None:
         self.screen.fill((235, 235, 235))
@@ -118,7 +135,7 @@ class GameController:
         self.allies_group.draw(self.screen)
         self.mouse_group.draw(self.screen)
         self.debug.display_info(f"FPS {int(self.clock.get_fps())}", 0)
-        self.debug.display_info(f"PORT {self.socket.getsockname()[1] if self.socket else None}", 1)
+        self.debug.display_info(f"PORT {self.tcp_socket.getsockname()[1] if self.tcp_socket else None}", 1)
         self.debug.display_info(f"SELF {self.player}", 2)
         self.debug.display_info(f"ALLIES {' | '.join(str(allie) for allie in self.allies_group)}", 3)
 
@@ -138,15 +155,20 @@ class GameController:
         else:
             self.player.direction.x = 0
 
-    def conncect_to_server(self, ip, port) -> None:
+    def initialize_server_connection(self, ip, port) -> None:
         try:
-            client_socket = socket(AF_INET6, SOCK_STREAM)
-            client_socket.connect((ip, port))
+            tcp_socket = socket(AF_INET6, SOCK_STREAM)
+            tcp_socket.connect((ip, port))
+
+            udp_socket = socket(AF_INET6, SOCK_DGRAM)
+            udp_socket.bind(('', 0))
+
         except (error, timeout, gaierror, herror, ConnectionRefusedError) as e:
             print("Connection error:", e)
         except Exception as e:
             print("Unexpected error:", e)
         else:
-            self.socket = client_socket
+            self.tcp_socket = tcp_socket
+            self.udp_socket = udp_socket
             self.online = True
-            self.socket.send(dumps(self.player.id))
+

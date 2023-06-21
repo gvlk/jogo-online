@@ -6,7 +6,7 @@ class Player(pg.sprite.Sprite):
     def __init__(self, player_id: str, pos: tuple) -> None:
         super().__init__()
         self.id = player_id
-        self.sheet = pg.image.load("assets/images/sprites/player_spritesheet.png").convert_alpha()
+        self.sheet = pg.image.load("client/assets/images/sprites/player_spritesheet.png").convert_alpha()
         self.image = self.get_sprite()
         self.rect = self.image.get_rect(center=pos)
         self.direction = Vector2()
