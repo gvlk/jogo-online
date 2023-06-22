@@ -3,19 +3,19 @@ from pygame.math import Vector2
 
 
 class Player(pg.sprite.Sprite):
-    def __init__(self, player_id: str, pos: tuple) -> None:
+    def __init__(self, player_id: str, player_pos: tuple) -> None:
         super().__init__()
         self.id = player_id
         self.sheet = pg.image.load("client/assets/images/sprites/player_spritesheet.png").convert_alpha()
         self.image = self.get_sprite()
-        self.rect = self.image.get_rect(center=pos)
+        self.rect = self.image.get_rect(center=player_pos)
         self.direction = Vector2()
         self.attributes = {
             'spd': 5
         }
 
     def __str__(self) -> str:
-        return f"{self.id}: {self.rect.topleft}"
+        return f"{self.id}{self.rect.topleft}"
 
     def get_sprite(self, i: int = 0) -> pg.Surface:
         sprite = pg.Surface((16, 28), pg.SRCALPHA)
