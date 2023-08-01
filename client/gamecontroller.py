@@ -5,26 +5,28 @@ from time import sleep
 
 import pygame as pg
 import pygame.freetype
-from pygame.math import Vector2
 
 from client.entities.allie import Allie
 from client.entities.player import Player
 from client.modules.debug import Debug
 from client.modules.mouse import Mouse
+from client.modules.obstacle import StaticObstacle
+from client.modules.ui import UI
 from common.modules.messagecode import MessageCode
-from common.modules.logger import logger
 
 
 def generate_random_name() -> str:
-    import random
-    import string
-
-    letters = string.ascii_letters
-    return "".join(random.choice(letters) for _ in range(4))
+    from random import choice
+    from string import ascii_uppercase, ascii_lowercase
+    u_consonants = "".join([c for c in ascii_uppercase if c not in "AEIOU"])
+    l_consonants = "".join([c for c in ascii_lowercase if c not in "aeiou"])
+    vowels = "aeiou"
+    random_string = choice(u_consonants) + choice(vowels) + choice(l_consonants) + choice(vowels)
+    return random_string
 
 
 class GameController:
-    def __init__(self, width: int, height: int, ip: str, server_tcp_port: int):
+    def __init__(self, width: int, height: int, ip: str, server_tcp_port: int, logger):
         # setup game parameters
         pg.init()
         pg.freetype.init()
@@ -37,6 +39,16 @@ class GameController:
         self.screen = pg.display.set_mode((width, height), pg.RESIZABLE)
         self.clock = pg.time.Clock()
         self.logger = logger
+
+        # setup game modules
+        self.player = Player(generate_random_name(), (width // 2, height // 2))
+        self.player_group = pg.sprite.GroupSingle(self.player)
+        self.mouse = Mouse()
+        self.mouse_group = pg.sprite.GroupSingle(self.mouse)
+        self.world_border_group = pg.sprite.Group()
+        self.start_world(width, height)
+        self.ui = UI(self.player)
+        self.debug = Debug()
 
         # setup multiplayer
         self.ip = ip
@@ -51,13 +63,6 @@ class GameController:
         self.allies_group = pg.sprite.Group()
         self.online = False
         self.tcp_socket_listener = Thread(target=self.listen_tcp_socket)
-
-        # setup game modules
-        self.player = Player(generate_random_name(), (width // 2, height // 2))
-        self.player_group = pg.sprite.GroupSingle(self.player)
-        self.mouse = Mouse()
-        self.mouse_group = pg.sprite.GroupSingle(self.mouse)
-        self.debug = Debug()
 
         # game ready to run
         self.run = True
@@ -77,7 +82,6 @@ class GameController:
         exit()
 
     def catch_events(self) -> None:
-        self.keyboard_control()
         for event in pygame.event.get():
 
             # quit game
@@ -88,16 +92,17 @@ class GameController:
                 if event.key == pg.K_ESCAPE:
                     self.run = False
                 elif event.key == pg.K_c:
-                    if not self.online:
-                        self.initialize_server_connection(self.ip, self.server_tcp_port)
+                    pass
+                    # if not self.online:
+                    #     self.initialize_server_connection(self.ip, self.server_tcp_port)
 
             # mouse movement
             elif event.type == pg.MOUSEMOTION:
-                self.mouse.pos = Vector2(pg.mouse.get_pos())
-                self.mouse.rect.center = self.mouse.pos
+                self.mouse.pos = pg.mouse.get_pos()
+                self.mouse_group.update()
 
     def update_game_state(self) -> None:
-        self.player_group.update()
+        self.player_group.update(self.world_border_group)
         self.allies_group.update()
         pg.display.update()
 
@@ -168,31 +173,24 @@ class GameController:
 
     def draw(self) -> None:
         self.screen.fill((235, 235, 235))
+        self.world_border_group.draw(self.screen)
         self.player_group.draw(self.screen)
         self.allies_group.draw(self.screen)
         self.mouse_group.draw(self.screen)
+
+        pg.draw.rect(self.screen, (255, 255, 0), self.player.hitbox, 1)
+        pg.draw.rect(self.screen, (255, 0, 0), self.player.rect, 1)
+
+        self.ui.display()
+
         self.debug.display_info(f"FPS: {int(self.clock.get_fps())}", 0)
-        self.debug.display_info(f"ONLINE: {self.online}", 1)
-        self.debug.display_info(f"TCP_PORT: {self.tcp_port if self.tcp_socket else None}", 2)
-        self.debug.display_info(f"UDP_PORT: {self.udp_port if self.udp_socket else None}", 3)
-        self.debug.display_info(f"SELF: {self.player}", 4)
-        self.debug.display_info(f"ALLIES: {' | '.join(str(allie) for allie in self.allies_group)}", 5)
+        self.debug.display_info(f"SELF: {self.player}", 1)
+        self.debug.display_info(f"MOUSE: {self.mouse}", 2)
 
-    def keyboard_control(self) -> None:
-        keys = pg.key.get_pressed()
-        if keys[pg.K_w]:
-            self.player.direction.y = -1
-        elif keys[pg.K_s]:
-            self.player.direction.y = 1
-        else:
-            self.player.direction.y = 0
-
-        if keys[pg.K_a]:
-            self.player.direction.x = -1
-        elif keys[pg.K_d]:
-            self.player.direction.x = 1
-        else:
-            self.player.direction.x = 0
+        # self.debug.display_info(f"ONLINE: {self.online}", 3)
+        # self.debug.display_info(f"TCP_PORT: {self.tcp_port if self.tcp_socket else None}", 4)
+        # self.debug.display_info(f"UDP_PORT: {self.udp_port if self.udp_socket else None}", 5)
+        # self.debug.display_info(f"ALLIES: {' | '.join(str(allie) for allie in self.allies_group)}", 6)
 
     # game will try to connect to server 3 times
     def initialize_server_connection(self, ip, server_tcp_port) -> None:
@@ -238,3 +236,44 @@ class GameController:
             sleep(2)
             response = loads(self.tcp_socket.recv(self.tcp_buffer_size))
             self.handle_server_response(response, self.tcp_socket.getpeername())
+
+    def start_world(self, width, height) -> None:
+        w, h = 600, 10
+        x = (width - w) // 2
+        y = ((height - w) // 2) - h
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 10, 600
+        x = ((width - h) // 2) - w
+        y = ((height - h) // 2)
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 600, 10
+        x = (width - w) // 2
+        y = ((height - w) // 2) + w
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 10, 600
+        x = ((width - h) // 2) + h
+        y = (height - h) // 2
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 50, 150
+        x = 400
+        y = 170
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 180, 60
+        x = 380
+        y = 400
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 80, 120
+        x = 750
+        y = 200
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+        w, h = 90, 110
+        x = 720
+        y = 500
+        self.world_border_group.add(StaticObstacle((x, y), (w, h)))

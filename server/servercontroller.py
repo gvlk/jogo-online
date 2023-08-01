@@ -2,7 +2,6 @@ from socket import socket, AF_INET6, SOCK_STREAM, SOCK_DGRAM
 from threading import Thread, Lock
 from time import sleep
 
-from common.modules.logger import logger
 from server.modules.clientstatus import ClientStatus
 from server.modules.clientthread import ClientThread
 
@@ -13,7 +12,7 @@ class ServerController:
     # SOCK_STREAM is a constant that represents the tcp_socket type for TCP connection
     # SOCK_DGRAM is a constant that represents the tcp_socket type for UDP connection
     # AF_INET6 is a constant that represents the address family for IPv6
-    def __init__(self, ip: str, tcp_port: int) -> None:
+    def __init__(self, ip: str, tcp_port: int, logger) -> None:
         self.ip = ip
         self.tcp_port = tcp_port
         self.tcp_socket = socket(AF_INET6, SOCK_STREAM)
