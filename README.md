@@ -1,15 +1,15 @@
 # jogo-online
 
-### Iniciar o servidor
-```bash
-python main.py -s
-```
-
-### Iniciar uma instância de jogador
+### Run
 ```bash
 python main.py
 ```
 
+### Start server
+```bash
+python main.py -s
+```
+
 ### Flags
-``-s`` Iniciar servidor  
-``-l`` Ativar logging
+``-s`` Start server  
+``-l`` Activate loggin (for server communication)
