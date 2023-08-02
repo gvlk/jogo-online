@@ -8,6 +8,7 @@ import pygame.freetype
 
 from client.entities.allie import Allie
 from client.entities.player import Player
+from client.entities.monster import Monster
 from client.modules.debug import Debug
 from client.modules.mouse import Mouse
 from client.modules.obstacle import StaticObstacle
@@ -26,6 +27,7 @@ def generate_random_name() -> str:
 
 
 class GameController:
+    # noinspection PyTypeChecker
     def __init__(self, width: int, height: int, ip: str, server_tcp_port: int, logger):
         # setup game parameters
         pg.init()
@@ -42,7 +44,10 @@ class GameController:
 
         # setup game modules
         self.player = Player(generate_random_name(), (width // 2, height // 2))
-        self.player_group = pg.sprite.GroupSingle(self.player)
+        self.player_group = pg.sprite.Group((self.player, self.player.weapon))
+        self.monster1 = Monster(generate_random_name(), ((width // 2) - 200, (height // 2) - 100), self.player)
+        self.monster2 = Monster(generate_random_name(), ((width // 2) + 100, (height // 2) + 200), self.player)
+        self.monster_group = pg.sprite.Group((self.monster1, self.monster2))
         self.mouse = Mouse()
         self.mouse_group = pg.sprite.GroupSingle(self.mouse)
         self.world_border_group = pg.sprite.Group()
@@ -96,13 +101,21 @@ class GameController:
                     # if not self.online:
                     #     self.initialize_server_connection(self.ip, self.server_tcp_port)
 
-            # mouse movement
             elif event.type == pg.MOUSEMOTION:
                 self.mouse.pos = pg.mouse.get_pos()
                 self.mouse_group.update()
 
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.select_entity()
+                # elif event.button == 2:
+                #     print("Middle mouse button clicked")
+                # elif event.button == 3:
+                #     print("Right mouse button clicked")
+
     def update_game_state(self) -> None:
         self.player_group.update(self.world_border_group)
+        self.monster_group.update(self.world_border_group)
         self.allies_group.update()
         pg.display.update()
 
@@ -119,6 +132,7 @@ class GameController:
         response = loads(response_bytes)
         self.handle_server_response(response, address)
 
+    # noinspection PyTypeChecker
     def handle_server_response(self, response, address) -> str:
         self.logger.debug(f"SERVER RESPONSE FROM PORT {address[1]}: {response}")
 
@@ -174,18 +188,27 @@ class GameController:
     def draw(self) -> None:
         self.screen.fill((235, 235, 235))
         self.world_border_group.draw(self.screen)
+        self.monster_group.draw(self.screen)
         self.player_group.draw(self.screen)
         self.allies_group.draw(self.screen)
         self.mouse_group.draw(self.screen)
 
         pg.draw.rect(self.screen, (255, 255, 0), self.player.hitbox, 1)
         pg.draw.rect(self.screen, (255, 0, 0), self.player.rect, 1)
-
+        pg.draw.rect(self.screen, (255, 255, 0), self.monster1.hitbox, 1)
+        pg.draw.rect(self.screen, (255, 0, 0), self.monster1.rect, 1)
         self.ui.display()
+
+        self.screen.blit(self.player.melee_radius_surface, self.player.melee_radius_rect)
+        self.screen.blit(self.monster1.melee_box_surface, self.monster1.melee_box_rect)
+        self.screen.blit(self.monster2.melee_box_surface, self.monster2.melee_box_rect)
 
         self.debug.display_info(f"FPS: {int(self.clock.get_fps())}", 0)
         self.debug.display_info(f"SELF: {self.player}", 1)
-        self.debug.display_info(f"MOUSE: {self.mouse}", 2)
+        self.debug.display_info(f"SELECTED: {self.player.selected_entity}", 2)
+        self.debug.display_info(f"MOUSE: {self.mouse}", 3)
+        # self.debug.display_info(f"PLAYER MASK: {self.player.melee_radius}", 4)
+        # self.debug.display_info(f"MONSTER MASK: {self.monster.melee_mask}", 5)
 
         # self.debug.display_info(f"ONLINE: {self.online}", 3)
         # self.debug.display_info(f"TCP_PORT: {self.tcp_port if self.tcp_socket else None}", 4)
@@ -237,23 +260,24 @@ class GameController:
             response = loads(self.tcp_socket.recv(self.tcp_buffer_size))
             self.handle_server_response(response, self.tcp_socket.getpeername())
 
+    # noinspection PyTypeChecker
     def start_world(self, width, height) -> None:
-        w, h = 600, 10
+        w, h = 800, 10
         x = (width - w) // 2
         y = ((height - w) // 2) - h
         self.world_border_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 10, 600
+        w, h = 10, 800
         x = ((width - h) // 2) - w
         y = ((height - h) // 2)
         self.world_border_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 600, 10
+        w, h = 800, 10
         x = (width - w) // 2
         y = ((height - w) // 2) + w
         self.world_border_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 10, 600
+        w, h = 10, 800
         x = ((width - h) // 2) + h
         y = (height - h) // 2
         self.world_border_group.add(StaticObstacle((x, y), (w, h)))
@@ -277,3 +301,7 @@ class GameController:
         x = 720
         y = 500
         self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+
+    def select_entity(self) -> None:
+        entity = pg.sprite.spritecollide(self.mouse, self.monster_group, False)
+        self.player.selected_entity = entity[0] if entity else None

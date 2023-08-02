@@ -1,0 +1,10 @@
+{
+  "001": {
+    "name": "Sword",
+    "damage": [2, 4],
+    "speed": 3.6,
+    "durability": [35, 35],
+    "sell_price": 3.90,
+    "graphic": ""
+  }
+}

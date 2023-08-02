@@ -12,9 +12,9 @@ class UI:
 
         self.player = player
         self.bars = {
-            "hp": Rect(10, 10, 200, 20),
-            "mp": Rect(10, 34, 140, 20),
-            "exp": Rect((WIDTH - 400) // 2, HEIGHT - 20, 400, 10)
+            "health": Rect(10, 10, 200, 20),
+            "mana": Rect(10, 34, 140, 20),
+            "experience": Rect((WIDTH - 400) // 2, HEIGHT - 20, 400, 10)
         }
 
     def show_bar(self, stat, color) -> None:
@@ -22,12 +22,12 @@ class UI:
         rect(self.display_surface, "#222222", bar)
 
         stat_bar = bar.copy()
-        stat_bar.width = bar.width * (self.player.stats[stat] / self.player.max_stats[stat])
+        stat_bar.width = bar.width * (self.player.current_stats[stat] / self.player.stats[stat])
 
         rect(self.display_surface, color, stat_bar)
         rect(self.display_surface, "#111111", bar, 3)
 
     def display(self) -> None:
-        self.show_bar("hp", "red")
-        self.show_bar("mp", "blue")
-        self.show_bar("exp", "purple")
+        self.show_bar("health", "red")
+        self.show_bar("mana", "blue")
+        self.show_bar("experience", "purple")

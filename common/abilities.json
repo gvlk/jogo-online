@@ -1,0 +1,29 @@
+{
+    "001": {
+        "name": "Auto-attack",
+        "cost": 0,
+        "range":  0,
+        "cast": 1,
+        "cooldown": 0,
+        "damage": 10,
+        "graphic": "client/assets/images/sprites/attack.png"
+    },
+    "002": {
+        "name": "Frostbolt",
+        "cost": 2,
+        "range": 40,
+        "cast": 2,
+        "cooldown": 0,
+        "damage": 70,
+        "graphic": "client/assets/images/sprites/fireball.png"
+    },
+    "003": {
+        "name": "Fire Blast",
+        "cost": 1,
+        "range": 40,
+        "cast": 0,
+        "cooldown": 12,
+        "damage": 115,
+        "graphic": "client/assets/images/sprites/heal.png"
+    }
+}
