@@ -12,22 +12,26 @@ class UI:
 
         self.player = player
         self.bars = {
-            "health": Rect(10, 10, 200, 20),
-            "mana": Rect(10, 34, 140, 20),
-            "experience": Rect((WIDTH - 400) // 2, HEIGHT - 20, 400, 10)
+            "h_p": Rect(10, 10, 200, 20),
+            "m_p": Rect(10, 34, 140, 20),
+            "e_p": Rect((WIDTH - 400) // 2, HEIGHT - 20, 400, 10),
+            "h_e": Rect(self.display_surface.get_width() - 210, 10, 200, 20)
         }
 
-    def show_bar(self, stat, color) -> None:
-        bar = self.bars[stat]
+    def show_bar(self, entity, stat, bar, color) -> None:
+        bar = self.bars[bar]
         rect(self.display_surface, "#222222", bar)
 
         stat_bar = bar.copy()
-        stat_bar.width = bar.width * (self.player.current_stats[stat] / self.player.stats[stat])
+        stat_bar.width = bar.width * (entity.stats[stat] / entity.fixed_stats[stat])
 
         rect(self.display_surface, color, stat_bar)
         rect(self.display_surface, "#111111", bar, 3)
 
     def display(self) -> None:
-        self.show_bar("health", "red")
-        self.show_bar("mana", "blue")
-        self.show_bar("experience", "purple")
+        self.show_bar(self.player, "health", "h_p", "green")
+        self.show_bar(self.player, "mana", "m_p", "blue")
+        self.show_bar(self.player, "experience", "e_p", "purple")
+        if self.player.selected_entity:
+            self.show_bar(self.player.selected_entity, "health", "h_e", "green")
+

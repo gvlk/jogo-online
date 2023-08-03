@@ -1,7 +1,10 @@
 from pygame.sprite import Sprite
 from pygame.surface import Surface
+from pygame.rect import Rect
+from pygame.math import Vector2
 from json import loads
 from pygame.image import load
+
 
 
 class Weapon(Sprite):
@@ -14,21 +17,6 @@ class Weapon(Sprite):
         self.image = Surface((40, 40))
         self.image.set_alpha(0)
         self.rect = self.image.get_rect()
-
-    def create_hitbox(self, player_rect, direction) -> None:
-        self.image = Surface((40, 40))
-        if direction == 0:
-            self.rect = self.image.get_rect(midtop=player_rect.midbottom)
-        elif direction == 1:
-            self.rect = self.image.get_rect(midbottom=player_rect.midtop)
-        elif direction == 2:
-            self.rect = self.image.get_rect(midright=player_rect.midleft)
-        else:
-            self.rect = self.image.get_rect(midleft=player_rect.midright)
-
-    def destroy_hitbox(self):
-        self.image = Surface((40, 40))
-        self.image.set_alpha(0)
 
     @staticmethod
     def get_info(weapon_id: int) -> dict:

@@ -14,4 +14,4 @@ class StaticObstacle(Sprite):
         self.image = Surface(size)
         self.image.fill(get_random_color())
         self.rect = self.image.get_rect(topleft=pos)
-        self.hitbox = self.rect.copy()
+        self.hitbox = self.rect.inflate(0, -10)

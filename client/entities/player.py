@@ -9,38 +9,40 @@ class Player(BaseEntity):
         self.weapon = Weapon(1)
         self.level = 0
         self.attributes = {
-            "stamina": 5,
-            "strength": 0,
-            "agility": 1,
-            "intellect": 0,
-            "critical_strike": 0,
+            "stamina": 25,
+            "strength": 5,
+            "agility": 5,
+            "intellect": 5,
+            "critical_strike": 1,
             "haste": 1,
             "mastery": 0,
             "versatility": 0,
             "avoidance": 0,
             "indestructible": 0,
             "leech": 0,
-            "speed": 5,
+            "speed": 6,
         }
         self.stats = {
             "health": round(self.attributes["stamina"] * 1.5),
             "mana": round(((self.level ** 2) * 5) + 15),
             "attack_power": round((self.attributes["strength"] + self.attributes["agility"]) / 2),
             "attack_speed": round(self.weapon.attributes["speed"] * self.attributes["haste"]),
-            "melee_critical_strike": self.attributes["critical_strike"],
-            "ranged_critical_strike": self.attributes["critical_strike"],
+            "melee_critical_strike": self.attributes["critical_strike"] + (self.attributes["agility"] / 2),
+            "ranged_critical_strike": self.attributes["critical_strike"] + (self.attributes["agility"] / 2),
             "spell_power": round(self.attributes["intellect"] * 1),
             "mana_regeneration": 5,  # 5% of base mana per 5 seconds
             "spell_critical_strike": self.attributes["critical_strike"],
-            "armor": 0,  # comes from gear
+            "armor": 3,  # comes from gear
             "dodge": round(self.attributes["agility"] * 0.1),
             "parry": round(self.attributes["agility"] * 0.1),
             "block": 0,
             "experience": 1
         }
-        self.current_stats = self.stats.copy()
+        self.fixed_stats = self.stats.copy()
         self.abilities = self.get_abilities(("001", "002", "003"))
+        self.ability_methods = self.get_ability_methods()
         self.selected_entity: BaseEntity | None = None
+        self.set_melee_radius(80)
 
     def input(self) -> None:
         keys = key.get_pressed()
@@ -72,15 +74,16 @@ class Player(BaseEntity):
         #     print("CLICK BOTAO MEIO")
 
         if keys[K_1] and not self.abilities["002"]["using"]:
-            self.use_ability("002")
+            self.use_ability("002", self.selected_entity)
         elif keys[K_2] and not self.abilities["003"]["using"]:
-            self.use_ability("003")
+            self.use_ability("003", self.selected_entity)
 
-    def auto_attack(self) -> None:
-        if self.in_melee_range(self.selected_entity):
-            pass
+    def act(self) -> None:
+        if self.selected_entity and not self.abilities["001"]["using"]:
+            self.use_ability("001", self.selected_entity)
 
-    def update(self, obstacles) -> None:
-        super().update(obstacles)
-        if self.selected_entity:
-            self.auto_attack()
+    def frostbolt_002(self) -> tuple:
+        pass
+
+    def fire_blast_003(self) -> tuple:
+        pass

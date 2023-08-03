@@ -9,6 +9,7 @@ import pygame.freetype
 from client.entities.allie import Allie
 from client.entities.player import Player
 from client.entities.monster import Monster
+from client.modules.camera import CameraGroup
 from client.modules.debug import Debug
 from client.modules.mouse import Mouse
 from client.modules.obstacle import StaticObstacle
@@ -48,10 +49,13 @@ class GameController:
         self.monster1 = Monster(generate_random_name(), ((width // 2) - 200, (height // 2) - 100), self.player)
         self.monster2 = Monster(generate_random_name(), ((width // 2) + 100, (height // 2) + 200), self.player)
         self.monster_group = pg.sprite.Group((self.monster1, self.monster2))
+        self.obstacles_group = pg.sprite.Group()
+        self.start_world(width, height)
+        self.camera = CameraGroup(self.player)
+        self.camera.add((self.player_group, self.monster_group, self.obstacles_group))
+
         self.mouse = Mouse()
         self.mouse_group = pg.sprite.GroupSingle(self.mouse)
-        self.world_border_group = pg.sprite.Group()
-        self.start_world(width, height)
         self.ui = UI(self.player)
         self.debug = Debug()
 
@@ -114,8 +118,8 @@ class GameController:
                 #     print("Right mouse button clicked")
 
     def update_game_state(self) -> None:
-        self.player_group.update(self.world_border_group)
-        self.monster_group.update(self.world_border_group)
+        self.player_group.update(self.obstacles_group)
+        self.monster_group.update(self.obstacles_group)
         self.allies_group.update()
         pg.display.update()
 
@@ -187,28 +191,16 @@ class GameController:
 
     def draw(self) -> None:
         self.screen.fill((235, 235, 235))
-        self.world_border_group.draw(self.screen)
-        self.monster_group.draw(self.screen)
-        self.player_group.draw(self.screen)
-        self.allies_group.draw(self.screen)
+        self.camera.draw(self.screen, True)
         self.mouse_group.draw(self.screen)
-
-        pg.draw.rect(self.screen, (255, 255, 0), self.player.hitbox, 1)
-        pg.draw.rect(self.screen, (255, 0, 0), self.player.rect, 1)
-        pg.draw.rect(self.screen, (255, 255, 0), self.monster1.hitbox, 1)
-        pg.draw.rect(self.screen, (255, 0, 0), self.monster1.rect, 1)
         self.ui.display()
 
-        self.screen.blit(self.player.melee_radius_surface, self.player.melee_radius_rect)
-        self.screen.blit(self.monster1.melee_box_surface, self.monster1.melee_box_rect)
-        self.screen.blit(self.monster2.melee_box_surface, self.monster2.melee_box_rect)
-
         self.debug.display_info(f"FPS: {int(self.clock.get_fps())}", 0)
-        self.debug.display_info(f"SELF: {self.player}", 1)
-        self.debug.display_info(f"SELECTED: {self.player.selected_entity}", 2)
-        self.debug.display_info(f"MOUSE: {self.mouse}", 3)
-        # self.debug.display_info(f"PLAYER MASK: {self.player.melee_radius}", 4)
-        # self.debug.display_info(f"MONSTER MASK: {self.monster.melee_mask}", 5)
+        self.debug.display_info(f"MOUSE: {self.mouse}", 1)
+        self.debug.display_info(f"SELF: {self.player}", 2)
+        self.debug.display_info(f"SELECTED: {self.player.selected_entity}", 3)
+        self.debug.display_info(f"MONSTER: {self.monster1}", 4)
+        self.debug.display_info(f"MONSTER: {self.monster2}", 5)
 
         # self.debug.display_info(f"ONLINE: {self.online}", 3)
         # self.debug.display_info(f"TCP_PORT: {self.tcp_port if self.tcp_socket else None}", 4)
@@ -262,46 +254,51 @@ class GameController:
 
     # noinspection PyTypeChecker
     def start_world(self, width, height) -> None:
-        w, h = 800, 10
+        w, h = 900, 60
         x = (width - w) // 2
         y = ((height - w) // 2) - h
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 10, 800
+        w, h = 60, 900
         x = ((width - h) // 2) - w
         y = ((height - h) // 2)
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 800, 10
+        w, h = 900, 60
         x = (width - w) // 2
         y = ((height - w) // 2) + w
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
-        w, h = 10, 800
+        w, h = 60, 900
         x = ((width - h) // 2) + h
         y = (height - h) // 2
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
         w, h = 50, 150
         x = 400
         y = 170
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
         w, h = 180, 60
         x = 380
         y = 400
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
         w, h = 80, 120
         x = 750
         y = 200
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
         w, h = 90, 110
         x = 720
         y = 500
-        self.world_border_group.add(StaticObstacle((x, y), (w, h)))
+        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
 
     def select_entity(self) -> None:
-        entity = pg.sprite.spritecollide(self.mouse, self.monster_group, False)
-        self.player.selected_entity = entity[0] if entity else None
+        offset_mouse = self.mouse.rect.copy()
+        offset_mouse.topleft -= self.camera.offset
+        entity = None
+        for entity in self.monster_group:
+            if offset_mouse.colliderect(entity.rect):
+                break
+        self.player.selected_entity = entity
