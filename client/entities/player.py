@@ -5,7 +5,7 @@ from pygame import key, K_w, K_a, K_s, K_d, K_1, K_2
 
 class Player(BaseEntity):
     def __init__(self, player_id: str, pos: tuple) -> None:
-        super().__init__(player_id, pos, "client/assets/images/sprites/player_spritesheet.png")
+        super().__init__("000" + player_id, pos)
         self.weapon = Weapon(1)
         self.level = 0
         self.attributes = {

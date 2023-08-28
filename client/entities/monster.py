@@ -6,7 +6,7 @@ from math import degrees, atan2
 
 class Monster(BaseEntity):
     def __init__(self, monster_id: str, pos: tuple, player: Player) -> None:
-        super().__init__(monster_id, pos, "client/assets/images/sprites/monster_spritesheet.png")
+        super().__init__("001" + monster_id, pos)
         self.level = 0
         self.attributes = {
             "stamina": 15,
@@ -43,7 +43,7 @@ class Monster(BaseEntity):
         self.ability_methods = self.get_ability_methods()
         self.player = player
         self.status = "idle"
-        self.set_melee_radius(60)
+        self.set_melee_radius(30)
         self.notice_radius = 350
 
     def __str__(self) -> str:
@@ -78,6 +78,6 @@ class Monster(BaseEntity):
         if not self.abilities["001"]["using"] and self.status == "attack":
             self.use_ability("001", self.player)
 
-    def move(self, speed: int, obstacles) -> None:
+    def move(self, speed: int) -> None:
         if self.status == "move":
-            super().move(self.attributes["speed"], obstacles)
+            super().move(self.attributes["speed"])

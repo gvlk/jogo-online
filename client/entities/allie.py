@@ -1,11 +1,12 @@
 import pygame as pg
+from fileio import get_sheet
 
 
 class Allie(pg.sprite.Sprite):
     def __init__(self, player_id: str, player_pos: tuple) -> None:
         super().__init__()
         self.id = player_id
-        self.sheet = pg.image.load("client/assets/images/sprites/player_spritesheet.png").convert_alpha()
+        self.sheet = get_sheet("000" + self.id)
         self.image = self.get_sprite()
         self.rect = self.image.get_rect(topleft=player_pos)
 

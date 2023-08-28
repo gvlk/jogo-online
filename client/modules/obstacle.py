@@ -1,5 +1,8 @@
 from pygame.sprite import Sprite
-from pygame import Surface
+from pygame.surface import Surface
+from pygame.rect import Rect
+
+from settings import TILESIZE
 
 
 def get_random_color() -> str:
@@ -9,9 +12,20 @@ def get_random_color() -> str:
 
 
 class StaticObstacle(Sprite):
-    def __init__(self, pos: tuple, size: tuple) -> None:
+    def __init__(self, pos: tuple, surface: Surface) -> None:
         super().__init__()
-        self.image = Surface(size)
-        self.image.fill(get_random_color())
+        self.image = surface
+        if self.image.get_height() > TILESIZE:
+            pos = (pos[0], pos[1] - TILESIZE)
+            self.hitbox_yoffset = self.image.get_height() // 2
+        else:
+            self.hitbox_yoffset = 0
         self.rect = self.image.get_rect(topleft=pos)
-        self.hitbox = self.rect.inflate(0, -10)
+        self.hitbox = Rect(
+            self.rect.left,
+            self.rect.top + self.hitbox_yoffset,
+            self.image.get_width(),
+            self.rect.h - self.hitbox_yoffset
+        )
+
+

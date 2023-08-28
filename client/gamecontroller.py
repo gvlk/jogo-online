@@ -1,3 +1,5 @@
+from settings import FPS
+
 from pickle import dumps, loads
 from socket import socket, AF_INET6, SOCK_STREAM, SOCK_DGRAM, timeout, gaierror, herror
 from threading import Thread
@@ -9,10 +11,10 @@ import pygame.freetype
 from client.entities.allie import Allie
 from client.entities.player import Player
 from client.entities.monster import Monster
+from client.modules.world import World
 from client.modules.camera import CameraGroup
 from client.modules.debug import Debug
 from client.modules.mouse import Mouse
-from client.modules.obstacle import StaticObstacle
 from client.modules.ui import UI
 from common.modules.messagecode import MessageCode
 
@@ -39,20 +41,20 @@ class GameController:
         pg.mouse.set_visible(False)
 
         # setup game
-        self.screen = pg.display.set_mode((width, height), pg.RESIZABLE)
+        self.screen = pg.display.set_mode((width, height))
         self.clock = pg.time.Clock()
         self.logger = logger
 
         # setup game modules
-        self.player = Player(generate_random_name(), (width // 2, height // 2))
+        self.world = World(0)
+        self.player = Player(generate_random_name(), (1792, 1200))
         self.player_group = pg.sprite.Group((self.player, self.player.weapon))
-        self.monster1 = Monster(generate_random_name(), ((width // 2) - 200, (height // 2) - 100), self.player)
-        self.monster2 = Monster(generate_random_name(), ((width // 2) + 100, (height // 2) + 200), self.player)
-        self.monster_group = pg.sprite.Group((self.monster1, self.monster2))
-        self.obstacles_group = pg.sprite.Group()
-        self.start_world(width, height)
-        self.camera = CameraGroup(self.player)
-        self.camera.add((self.player_group, self.monster_group, self.obstacles_group))
+        self.monster1 = Monster(generate_random_name(), (2150, 790), self.player)
+        self.monster2 = Monster(generate_random_name(), (2250, 810), self.player)
+        self.monster3 = Monster(generate_random_name(), (2350, 830), self.player)
+        self.monster_group = pg.sprite.Group((self.monster1, self.monster2, self.monster3))
+        self.camera = CameraGroup(self.player, self.world)
+        self.camera.add((self.player_group, self.monster_group))
 
         self.mouse = Mouse()
         self.mouse_group = pg.sprite.GroupSingle(self.mouse)
@@ -83,7 +85,7 @@ class GameController:
             self.catch_events()
             self.update_game_state()
             self.draw()
-            self.clock.tick(30)
+            self.clock.tick(FPS)
         if self.online:
             self.tcp_socket.close()
             self.udp_socket.close()
@@ -118,8 +120,8 @@ class GameController:
                 #     print("Right mouse button clicked")
 
     def update_game_state(self) -> None:
-        self.player_group.update(self.obstacles_group)
-        self.monster_group.update(self.obstacles_group)
+        self.player_group.update(self.world.get_chunks, 2, 1)
+        self.monster_group.update(self.world.get_chunks, 1, 1)
         self.allies_group.update()
         pg.display.update()
 
@@ -190,8 +192,7 @@ class GameController:
         return response["code"]
 
     def draw(self) -> None:
-        self.screen.fill((235, 235, 235))
-        self.camera.draw(self.screen, True)
+        self.camera.draw(True)
         self.mouse_group.draw(self.screen)
         self.ui.display()
 
@@ -252,53 +253,10 @@ class GameController:
             response = loads(self.tcp_socket.recv(self.tcp_buffer_size))
             self.handle_server_response(response, self.tcp_socket.getpeername())
 
-    # noinspection PyTypeChecker
-    def start_world(self, width, height) -> None:
-        w, h = 900, 60
-        x = (width - w) // 2
-        y = ((height - w) // 2) - h
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 60, 900
-        x = ((width - h) // 2) - w
-        y = ((height - h) // 2)
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 900, 60
-        x = (width - w) // 2
-        y = ((height - w) // 2) + w
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 60, 900
-        x = ((width - h) // 2) + h
-        y = (height - h) // 2
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 50, 150
-        x = 400
-        y = 170
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 180, 60
-        x = 380
-        y = 400
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 80, 120
-        x = 750
-        y = 200
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
-        w, h = 90, 110
-        x = 720
-        y = 500
-        self.obstacles_group.add(StaticObstacle((x, y), (w, h)))
-
     def select_entity(self) -> None:
-        offset_mouse = self.mouse.rect.copy()
-        offset_mouse.topleft -= self.camera.offset
-        entity = None
+        self.mouse.rel_rect.topleft = self.mouse.rect.topleft + self.camera.offset
         for entity in self.monster_group:
-            if offset_mouse.colliderect(entity.rect):
-                break
-        self.player.selected_entity = entity
+            if self.mouse.rel_rect.colliderect(entity.rect):
+                self.player.selected_entity = entity
+                return
+        self.player.selected_entity = None

@@ -1,8 +1,8 @@
 from random import randint, choices
-from json import loads
+from fileio import get_abilities_dict, get_sheet
+from settings import TILESIZE
 from pygame import Surface, SRCALPHA
 from pygame.rect import Rect
-from pygame.image import load
 from pygame.transform import scale
 from pygame.sprite import Sprite
 from pygame.math import Vector2
@@ -10,19 +10,30 @@ from pygame.time import get_ticks
 from pygame.draw import circle
 from pygame.mask import from_surface, Mask
 from client.modules.weapon import Weapon
+from pygame.sprite import Group
 from common.modules.actioncode import ActionCode
 
 
 class BaseEntity(Sprite):
-    def __init__(self, entity_id: str, pos: tuple, spritesheet: str) -> None:
+    def __init__(self, entity_id: str, pos: tuple) -> None:
         super().__init__()
         self.id = entity_id
-        self.sheet = load(spritesheet).convert_alpha()
+        self.sheet = get_sheet(self.id)
         self.sprite_w = self.sheet.get_size()[0] // 4
         self.sprite_h = self.sheet.get_size()[1]
         self.image = self.get_sprite(0)
-        self.rect = self.image.get_rect(center=pos)
-        self.hitbox = self.rect.inflate(0, -16)
+        self.rect = self.image.get_rect(topleft=pos)
+        if self.image.get_height() > TILESIZE:
+            self.hitbox_yoffset = self.image.get_height() // 2
+        else:
+            self.hitbox_yoffset = 0
+        self.hitbox = Rect(
+            self.rect.left,
+            self.rect.top + self.hitbox_yoffset,
+            self.image.get_width(),
+            self.rect.h - self.hitbox_yoffset
+        )
+        self.hitbox = self.hitbox.inflate(0, -16)
 
         self.melee_radius_surface: Surface | None = None
         self.melee_radius_rect: Rect | None = None
@@ -33,6 +44,8 @@ class BaseEntity(Sprite):
 
         self.direction = Vector2()
         self.facing = 0
+
+        self.obstacles = Group()
 
         self.attributes = dict()
         self.abilities = dict()
@@ -50,13 +63,12 @@ class BaseEntity(Sprite):
             (0, 0),
             (0 + (i * self.sprite_w), 0, self.sprite_w + (i * self.sprite_w), self.sprite_h)
         )
-        return scale(sprite, (self.sprite_w * 2, self.sprite_h * 2))
+        return scale(sprite, (self.sprite_w * 4, self.sprite_h * 4))
 
     @staticmethod
     def get_abilities(abilities: tuple) -> dict:
         entity_abilities = dict()
-        with open("common/abilities.json", "r") as abilities_file:
-            abilities_data: dict = loads(abilities_file.read())
+        abilities_data = get_abilities_dict()
         for ability in abilities:
             entity_abilities[ability] = abilities_data[ability].copy()
             entity_abilities[ability]["using"] = False
@@ -79,10 +91,10 @@ class BaseEntity(Sprite):
         if code != ActionCode.TOO_FAR:
             self.abilities[ability]["using"] = True
             self.abilities[ability]["use_time"] = get_ticks()
-            print(f"{code} | GIVEN: {given_damage} | RECEIVED {received_damage}")
+            # print(f"{code} | GIVEN: {given_damage} | RECEIVED {received_damage}")
 
     def is_alive(self) -> bool:
-        return self.stats["health"] >= 0
+        return self.stats["health"] > 0
 
     def input(self) -> None:
         pass
@@ -94,18 +106,19 @@ class BaseEntity(Sprite):
         self.image = self.get_sprite(self.facing)
         self.rect = self.image.get_rect(center=self.hitbox.center)
 
-    def move(self, speed: int, obstacles) -> None:
+    def move(self, speed: int) -> None:
         if self.direction.magnitude() != 0:
             self.direction = self.direction.normalize()
 
         self.hitbox.x += self.direction.x * speed
-        self.obstacle_collision(0, obstacles)
+        self.obstacle_collision(0)
         self.hitbox.y += self.direction.y * speed
-        self.obstacle_collision(1, obstacles)
-        self.rect.center = self.hitbox.center
+        self.obstacle_collision(1)
+        self.rect.centerx = self.hitbox.centerx
+        self.rect.centery = self.hitbox.centery - (self.hitbox_yoffset // 2)
 
-    def obstacle_collision(self, direction: int, sprites):
-        for sprite in sprites:
+    def obstacle_collision(self, direction: int) -> None:
+        for sprite in self.obstacles:
             if sprite.hitbox.colliderect(self.hitbox):
                 if direction == 0:
                     if self.direction.x > 0:
@@ -120,10 +133,10 @@ class BaseEntity(Sprite):
                         self.hitbox.top = sprite.hitbox.bottom
 
     def in_melee_range(self, entity) -> bool:
-        self.melee_radius_rect.center = self.rect.center
-        self.melee_box_rect.center = self.rect.center
-        entity.melee_radius_rect.center = entity.rect.center
-        entity.melee_box_rect.center = entity.rect.center
+        self.melee_radius_rect.center = self.hitbox.center
+        self.melee_box_rect.center = self.hitbox.center
+        entity.melee_radius_rect.center = entity.hitbox.center
+        entity.melee_box_rect.center = entity.hitbox.center
 
         offset = (
             entity.melee_box_rect.left - self.melee_radius_rect.left,
@@ -196,7 +209,7 @@ class BaseEntity(Sprite):
 
         return ActionCode.SPELL_SUCCESS, round(received_damage)
 
-    def update(self, obstacles) -> None:
+    def update(self, get_chunks, x_amp, y_amp) -> None:
         if self.is_alive():
             self.input()
             for ability in self.abilities:
@@ -204,6 +217,7 @@ class BaseEntity(Sprite):
                     self.cooldowns(ability)
             self.act()
             self.animate()
-            self.move(self.attributes["speed"], obstacles)
+            self.obstacles = get_chunks(self.rect.topleft, x_amp, y_amp)
+            self.move(self.attributes["speed"])
         else:
             self.kill()
